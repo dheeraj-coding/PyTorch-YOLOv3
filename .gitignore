@@ -13,3 +13,4 @@ checkpoints
 *.names
 *.data
 swish/
+runs/

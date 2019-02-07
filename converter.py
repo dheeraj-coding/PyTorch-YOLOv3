@@ -6,10 +6,10 @@ data_frame = pd.read_csv('training.csv')
 
 height = 480
 width = 640
+if not os.path.exists(osp.join(os.getcwd(), 'data/swish')):
+    os.makedirs(osp.join(os.getcwd(), 'data/swish'))
 if not os.path.exists(osp.join(os.getcwd(), 'data/swish/labels/')):
     os.makedirs(osp.join(os.getcwd(), 'data/swish/labels/'))
-if not os.path.exists(osp.join(os.getcwd(), 'data/swish/train.txt')):
-    os.makedirs(osp.join(os.getcwd(), 'data/swish/train.txt'))
 print(os.getcwd())
 txt = open(osp.join(os.getcwd(), 'data/swish/train.txt'), 'w+')
 for idx, name in enumerate(data_frame['image_name']):

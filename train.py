@@ -21,9 +21,6 @@ from torch.autograd import Variable
 import torch.optim as optim
 
 import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-from matplotlib.ticker import NullLocator
-from matplotlib.backends.backend_agg import FigureCanvasAgg
 
 from tensorboardX import SummaryWriter
 
@@ -128,43 +125,46 @@ for epoch in range(opt.epochs):
         writer.add_scalar('data/losses/conf', model.losses['conf'], n_iter)
         writer.add_scalar('data/losses/cls', model.losses['cls'], n_iter)
         writer.add_scalar('data/losses/total', loss.item(), n_iter)
+        with torch.no_grad():
+            image_pred = imgs[0].permute(1, 2, 0)
+            image_pred = image_pred.cpu().numpy() * 255
+            image_pred = image_pred.astype(np.uint8)
+            detections = model(imgs[0].unsqueeze(0))
+            detections = non_max_suppression(detections, 1, opt.conf_thres, opt.nms_thres)
+            detections = detections[0]
 
-        image_pred = imgs[0].permute(1, 2, 0)
-        image_pred = image_pred.cpu().numpy() * 255
-        image_pred = image_pred.astype(np.uint8)
-        detections = model(imgs[0].unsqueeze(0))
-        detections = non_max_suppression(detections, 1, opt.conf_thres, opt.nms_thres)
-        detections = detections[0]
+            # The amount of padding that was added
+            pad_x = max(imgs[0].shape[0] - imgs[0].shape[1], 0) * (opt.img_size / max(imgs[0].shape))
+            pad_y = max(imgs[0].shape[1] - imgs[0].shape[0], 0) * (opt.img_size / max(imgs[0].shape))
+            # Image height and width after padding is removed
+            unpad_h = opt.img_size - pad_y
+            unpad_w = opt.img_size - pad_x
 
-        # The amount of padding that was added
-        pad_x = max(imgs[0].shape[0] - imgs[0].shape[1], 0) * (opt.img_size / max(imgs[0].shape))
-        pad_y = max(imgs[0].shape[1] - imgs[0].shape[0], 0) * (opt.img_size / max(imgs[0].shape))
-        # Image height and width after padding is removed
-        unpad_h = opt.img_size - pad_y
-        unpad_w = opt.img_size - pad_x
+            # Draw bounding boxes and labels of detections
+            if detections is not None:
+                unique_labels = detections[:, -1].cpu().unique()
+                n_cls_preds = len(unique_labels)
+                bbox_colors = random.sample(colors, n_cls_preds)
+                for x1, y1, x2, y2, conf, cls_conf, cls_pred in detections:
+                    # Rescale coordinates to original dimensions
+                    box_h = ((y2 - y1) / unpad_h) * imgs[0].shape[0]
+                    box_w = ((x2 - x1) / unpad_w) * imgs[0].shape[1]
+                    y1 = ((y1 - pad_y // 2) / unpad_h) * imgs[0].shape[0]
+                    x1 = ((x1 - pad_x // 2) / unpad_w) * imgs[0].shape[1]
+                    try:
+                        image_pred = cv2.rectangle(image_pred, (x1, y1), (x1 + box_w, y1 + box_h), (255, 0, 0),
+                                                   thickness=2)
+                    except:
+                        image_pred = None
 
-        # Draw bounding boxes and labels of detections
-        if detections is not None:
-            unique_labels = detections[:, -1].cpu().unique()
-            n_cls_preds = len(unique_labels)
-            bbox_colors = random.sample(colors, n_cls_preds)
-            for x1, y1, x2, y2, conf, cls_conf, cls_pred in detections:
-                # Rescale coordinates to original dimensions
-                box_h = ((y2 - y1) / unpad_h) * imgs[0].shape[0]
-                box_w = ((x2 - x1) / unpad_w) * imgs[0].shape[1]
-                y1 = ((y1 - pad_y // 2) / unpad_h) * imgs[0].shape[0]
-                x1 = ((x1 - pad_x // 2) / unpad_w) * imgs[0].shape[1]
-
-                image_pred = cv2.rectangle(image_pred, (x1, y1), (x1 + box_w, y1 + box_h), (255, 0, 0), thickness=2)
-
-        # Save generated image with detections
-        X = torch.from_numpy(image_pred.astype(np.float16) / 255)
-        X = X.permute(2, 0, 1).unsqueeze(0)
-        X = tutils.make_grid(X)
-        writer.add_image('Image', X, n_iter)
-
-        plt.close()
-
+            # Save generated image with detections
+            try:
+                X = torch.from_numpy(image_pred.astype(np.float16) / 255)
+                X = X.permute(2, 0, 1).unsqueeze(0)
+                X = tutils.make_grid(X)
+                writer.add_image('Image', X, n_iter)
+            except:
+                continue
         model.seen += imgs.size(0)
     if epoch % opt.checkpoint_interval == 0:
         model.save_weights("%s/%d.weights" % (opt.checkpoint_dir, epoch))

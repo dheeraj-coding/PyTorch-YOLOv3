@@ -2,7 +2,7 @@ import pandas as pd
 import os
 import os.path as osp
 
-data_frame = pd.read_csv('training.csv')
+data_frame = pd.read_csv('test2.csv')
 
 height = 480
 width = 640

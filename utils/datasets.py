@@ -1,9 +1,11 @@
 import glob
 import random
 import os
+import os.path as osp
 import numpy as np
 
 import torch
+import pandas as pd
 
 from torch.utils.data import Dataset
 from PIL import Image
@@ -18,8 +20,11 @@ import sys
 
 
 class ImageFolder(Dataset):
-    def __init__(self, folder_path, img_size=416):
-        self.files = sorted(glob.glob('%s/*.*' % folder_path))
+    def __init__(self, folder_path, csv_path, img_size=416):
+        self.data_frame = pd.read_csv(csv_path)
+        self.file_path = self.data_frame['image_name']
+        # self.files = sorted(glob.glob('%s/*.*' % folder_path))
+        self.files = [osp.join(os.getcwd(), folder_path, fn) for fn in self.file_path]
         self.img_shape = (img_size, img_size)
 
     def __getitem__(self, index):
